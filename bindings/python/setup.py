@@ -34,7 +34,7 @@ setup(
     author_email="",
     url="https://github.com/patrickvonplaten/wavem",
     license="Apache License 2.0",
-    rust_extensions=[RustExtension("wavem._wavem_rust", binding=Binding.PyO3, debug=False)],
+    # rust_extensions=[RustExtension("wavem._wavem_rust", binding=Binding.PyO3, debug=False)],
     extras_require=extras,
     classifiers=[
         "Development Status :: 5 - Production/Stable",

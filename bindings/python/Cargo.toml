@@ -1,0 +1,15 @@
+[package]
+name = "wavem-python"
+version = "0.0.1"
+edition = "2023"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "wavem_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+
+[dependencies.wavem]
+version = "*"
+path = "../../wavem"
