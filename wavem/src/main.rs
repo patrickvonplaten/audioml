@@ -41,6 +41,8 @@ fn main() {
     // Probe the media source.
     let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts).expect("unsupported format");
 
+    println!("probed {:?}", probed);
+
         // Get the instantiated format reader.
     let mut format = probed.format;
 
@@ -65,13 +67,6 @@ fn main() {
         // Get the next packet from the media format.
         let packet = match format.next_packet() {
             Ok(packet) => packet,
-            Err(Error::ResetRequired) => {
-                // The track list has been changed. Re-examine it and create a new set of decoders,
-                // then restart the decode loop. This is an advanced feature and it is not
-                // unreasonable to consider this "the end." As of v0.5.0, the only usage of this is
-                // for chained OGG physical streams.
-                unimplemented!();
-            }
             Err(err) => {
                 // A unrecoverable error occured, halt decoding.
                 panic!("{}", err);
@@ -86,11 +81,6 @@ fn main() {
             // Consume the new metadata at the head of the metadata queue.
         }
 
-        // If the packet does not belong to the selected track, skip over it.
-        if packet.track_id() != track_id {
-            continue;
-        }
-
         let decoded = decoder.decode(&packet).unwrap();
 
         let samples = match decoded {
@@ -98,6 +88,6 @@ fn main() {
             // Similarly call other functions
             _ => panic!("Unknown audio buffer format"),
         };
-        println!("{}", samples.len());
+        // println!("{}", samples.len());
     }
 }
