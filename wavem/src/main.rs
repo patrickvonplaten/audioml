@@ -22,7 +22,7 @@ fn process_s16(buf: &AudioBuffer<i16>) -> Vec<i16> {
 
 fn main() {
     // The path to the audio file.
-    let path = Path::new("/home/patrick/audios/bella_ciao_guitar.wav");
+    let path = Path::new("/Users/patrickvonplaten/audios/sample.wav");
 
     // Open the media source.
     let file = std::fs::File::open(&path).expect("failed to open media");
