@@ -9,6 +9,7 @@ use symphonia::core::formats::FormatOptions;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::probe::Hint;
+use symphonia;
 
 
 fn process_s16(buf: &AudioBuffer<i16>) -> Vec<i16> {
@@ -72,18 +73,18 @@ fn main() {
                                                     .expect("unsupported codec");
 
     // The decode loop.
-    let result: Result<T, symphonia::symphonia_core::errors::Error> = loop {
+    loop {
         // Get the next packet from the media format.
         let packet = match format.next_packet() {
             Ok(packet) => packet,
-            Err(err) => break Err(err),
+            Err(err) => break,
         };
 
-        match decoder.decode(&packet) {
+        let decoded = match decoder.decode(&packet) {
             Ok(_decoded) => continue,
             Err(Error::DecodeError(err)) => panic!("{:?}", err),
-            Err(err) => break Err(err),
-        }
+            Err(err) => break,
+        };
     };
 
     // ignore_end_of_stream_error(result)?;
