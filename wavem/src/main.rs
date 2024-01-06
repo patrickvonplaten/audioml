@@ -20,6 +20,20 @@ fn process_s16(buf: &AudioBuffer<i16>) -> Vec<i16> {
     samples
 }
 
+// fn ignore_end_of_stream_error(result: Result) -> Result {
+//     match result {
+//         Err(Error::IoError(err))
+//             if err.kind() == std::io::ErrorKind::UnexpectedEof
+//                 && err.to_string() == "end of stream" =>
+//         {
+//             // Do not treat "end of stream" as a fatal error. It's the currently only way a
+//             // format reader can indicate the media is complete.
+//             Ok(())
+//         }
+//         _ => result
+//     }
+// }
+
 fn main() {
     // The path to the audio file.
     let path = Path::new("/Users/patrickvonplaten/audios/sample.wav");
@@ -41,9 +55,7 @@ fn main() {
     // Probe the media source.
     let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts).expect("unsupported format");
 
-    println!("probed {:?}", probed);
-
-        // Get the instantiated format reader.
+    // Get the instantiated format reader.
     let mut format = probed.format;
 
     // Find the first audio track with a known (decodeable) codec.
@@ -59,35 +71,20 @@ fn main() {
     let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)
                                                     .expect("unsupported codec");
 
-    // Store the track identifier, it will be used to filter packets.
-    let track_id = track.id;
-
     // The decode loop.
-    loop {
+    let result: Result<T, symphonia::symphonia_core::errors::Error> = loop {
         // Get the next packet from the media format.
         let packet = match format.next_packet() {
             Ok(packet) => packet,
-            Err(err) => {
-                // A unrecoverable error occured, halt decoding.
-                panic!("{}", err);
-            }
+            Err(err) => break Err(err),
         };
 
-        // Consume any new metadata that has been read since the last packet.
-        while !format.metadata().is_latest() {
-            // Pop the old head of the metadata queue.
-            format.metadata().pop();
-
-            // Consume the new metadata at the head of the metadata queue.
+        match decoder.decode(&packet) {
+            Ok(_decoded) => continue,
+            Err(Error::DecodeError(err)) => panic!("{:?}", err),
+            Err(err) => break Err(err),
         }
+    };
 
-        let decoded = decoder.decode(&packet).unwrap();
-
-        let samples = match decoded {
-            AudioBufferRef::S16(buf) => process_s16(&buf),
-            // Similarly call other functions
-            _ => panic!("Unknown audio buffer format"),
-        };
-        // println!("{}", samples.len());
-    }
+    // ignore_end_of_stream_error(result)?;
 }
