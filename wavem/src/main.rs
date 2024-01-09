@@ -3,6 +3,7 @@ use std::io::BufReader;
 use std::path::Path;
 
 use symphonia::core::audio::{AudioBufferRef, AudioBuffer, Signal};
+use symphonia::core::sample::Sample;
 use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::FormatOptions;
@@ -81,7 +82,11 @@ fn main() {
         };
 
         let decoded = match decoder.decode(&packet) {
-            Ok(_decoded) => continue,
+            Ok(_decoded) => {
+                let decoded: AudioBuffer<i32> = _decoded.make_equivalent();
+                // println!("decoded {:?}", decoded);
+                continue
+            },
             Err(Error::DecodeError(err)) => panic!("{:?}", err),
             Err(err) => break,
         };
