@@ -1,4 +1,6 @@
 use std::path::Path;
+use std::env;
+use std::process;
 
 use symphonia::core::audio::{AudioBuffer, Signal};
 use symphonia::core::sample::Sample;
@@ -82,10 +84,21 @@ fn read_samples(file_path: &str, samples_buffer: &mut Vec<i16>) {
 
 
 fn main() {
-    let path: &str = "/Users/patrickvonplaten/audios/sample.wav";
+    // let path: &str = "/Users/patrickvonplaten/audios/sample.wav";
+    let args: Vec<String> = env::args().collect();
+
+    // Check if an argument is provided
+    if args.len() < 2 {
+        eprintln!("Usage: {} <file_path>", args[0]);
+        process::exit(1);
+    }
+
+    // The second argument is the file path
+    let path = &args[1];
+
     let mut vec: Vec<i16> = Vec::new();
 
     read_samples(path, &mut vec);
 
-    println!("Done");
+    println!("Done. Length {:?}", vec.len());
 }
