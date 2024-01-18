@@ -1,8 +1,6 @@
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 
-use symphonia::core::audio::{AudioBufferRef, AudioBuffer, Signal};
+use symphonia::core::audio::{AudioBuffer, Signal};
 use symphonia::core::sample::Sample;
 use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
 use symphonia::core::errors::Error;
@@ -10,38 +8,27 @@ use symphonia::core::formats::FormatOptions;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::probe::Hint;
-use symphonia;
 
 
-fn process_s16(buf: &AudioBuffer<i16>) -> Vec<i16> {
-    let mut samples = Vec::new();
-    for &sample in buf.chan(0) {
-        // Do something with `sample`.
-        samples.push(sample);
+use std::fs::File;
+use std::io::{self, Write};
+
+
+fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()> {
+    let mut file = File::create(file_path)?;
+
+    for &value in vec {
+        writeln!(file, "{}", value)?;
     }
-    samples
+
+    Ok(())
 }
 
-// fn ignore_end_of_stream_error(result: Result) -> Result {
-//     match result {
-//         Err(Error::IoError(err))
-//             if err.kind() == std::io::ErrorKind::UnexpectedEof
-//                 && err.to_string() == "end of stream" =>
-//         {
-//             // Do not treat "end of stream" as a fatal error. It's the currently only way a
-//             // format reader can indicate the media is complete.
-//             Ok(())
-//         }
-//         _ => result
-//     }
-// }
 
-fn main() {
-    // The path to the audio file.
-    let path = Path::new("/Users/patrickvonplaten/audios/sample.wav");
+fn read_samples(file_path: &str, samples_buffer: &mut Vec<i16>) {
+    let path = Path::new(file_path);
 
-    // Open the media source.
-    let file = std::fs::File::open(&path).expect("failed to open media");
+    let file = std::fs::File::open(path).expect("failed to open media");
 
     // Create the media source stream.
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
@@ -70,27 +57,35 @@ fn main() {
     let dec_opts: DecoderOptions = Default::default();
 
     // Create a decoder for the track.
-    let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)
-                                                    .expect("unsupported codec");
+    let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts).expect("unsupported codec");
 
-    // The decode loop.
     loop {
         // Get the next packet from the media format.
         let packet = match format.next_packet() {
             Ok(packet) => packet,
-            Err(err) => break,
+            Err(_) => break,
         };
 
-        let decoded = match decoder.decode(&packet) {
+        match decoder.decode(&packet) {
             Ok(_decoded) => {
-                let decoded: AudioBuffer<i32> = _decoded.make_equivalent();
-                // println!("decoded {:?}", decoded);
+                let mut audio_buffer: AudioBuffer<i16> = _decoded.make_equivalent();
+                _decoded.convert(&mut audio_buffer);
+
+                samples_buffer.extend(audio_buffer.chan(0));
                 continue
             },
             Err(Error::DecodeError(err)) => panic!("{:?}", err),
-            Err(err) => break,
+            Err(_) => break,
         };
     };
+}
 
-    // ignore_end_of_stream_error(result)?;
+
+fn main() {
+    let path: &str = "/Users/patrickvonplaten/audios/sample.wav";
+    let mut vec: Vec<i16> = Vec::new();
+
+    read_samples(path, &mut vec);
+
+    println!("Done");
 }
