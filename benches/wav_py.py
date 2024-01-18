@@ -7,7 +7,7 @@ folder_path = sys.argv[1]
 
 for file_path in os.listdir(folder_path):
     abs_file_path = os.path.join(folder_path, file_path)
-    samplerate, data = wavfile.read(abs_file_path)
+    samplerate, data = wavfile.read(abs_file_path, mmap=True)
 
     data = data if len(data.shape) < 2 else data[:, 0]
 
