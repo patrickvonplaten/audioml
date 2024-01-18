@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::env;
 use std::process;
+use std::fs;
 
 use symphonia::core::audio::{AudioBuffer, Signal};
 use symphonia::core::sample::Sample;
@@ -27,9 +28,7 @@ fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()>
 }
 
 
-fn read_samples(file_path: &str, samples_buffer: &mut Vec<i16>) {
-    let path = Path::new(file_path);
-
+fn read_samples(path: &Path, samples_buffer: &mut Vec<i16>) {
     let file = std::fs::File::open(path).expect("failed to open media");
 
     // Create the media source stream.
@@ -94,11 +93,19 @@ fn main() {
     }
 
     // The second argument is the file path
-    let path = &args[1];
+    let dir = Path::new(&args[1]);
 
-    let mut vec: Vec<i16> = Vec::new();
+    for entry in fs::read_dir(&dir).unwrap() {
+        let mut filename = entry.unwrap().file_name(); 
+        let filename = filename.to_str().unwrap(); // Get DirEntry from the iterator
 
-    read_samples(path, &mut vec);
+        let file_path = Path::new(filename);
+        let abs_file_path = dir.join(file_path);
 
-    println!("Done. Length {:?}", vec.len());
+        let mut vec: Vec<i16> = Vec::new();
+        read_samples(&abs_file_path, &mut vec);
+
+        println!("Done Rust. Length {:?}", vec.len());
+    }
 }
+
