@@ -67,16 +67,19 @@ fn read_samples(path: &Path) -> Vec<i16> {
         0
     };
 
+    let mut samples_buffer: Vec<i16> = Vec::with_capacity(sample_len);
+    // let mut samples_buffer: Vec<i16> = vec![0; sample_len];
+    // let mut start_index = 0;
+    // let mut end_index;
+
     // let mut samples_buffer: Vec<i16> = Vec::with_capacity(sample_len);
-    let mut samples_buffer: Vec<i16> = vec![0; sample_len];
 
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
 
     // Create a decoder for the track.
     let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts).expect("unsupported codec");
-    let mut start_index = 0;
-    let mut end_index;
+
 
     loop {
         // Get the next packet from the media format.
@@ -90,11 +93,11 @@ fn read_samples(path: &Path) -> Vec<i16> {
                 match decoded {
                     AudioBufferRef::S16(buf) => {
                         let samples = buf.chan(0);
+                        samples_buffer.extend_from_slice(&samples);
 
-                        end_index = start_index + samples.len();
-
-                        samples_buffer[start_index..end_index].copy_from_slice(&samples);
-                        start_index = end_index;
+                        // end_index = start_index + samples.len();
+                        // samples_buffer[start_index..end_index].copy_from_slice(&samples);
+                        // start_index = end_index;
                     },
                     _ => {
                         unimplemented!()
