@@ -35,7 +35,7 @@ fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()>
 }
 
 
-fn read_samples(path: &Path) {
+fn read_samples(path: &Path) -> Vec<i16> {
     let file = std::fs::File::open(path).expect("failed to open media");
 
     // Create the media source stream.
@@ -67,13 +67,16 @@ fn read_samples(path: &Path) {
         0
     };
 
-    let mut samples: <Vec<i16> = Vec::with_capacity(sample_len);
+    // let mut samples_buffer: Vec<i16> = Vec::with_capacity(sample_len);
+    let mut samples_buffer: Vec<i16> = vec![0; sample_len];
 
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
 
     // Create a decoder for the track.
     let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts).expect("unsupported codec");
+    let mut start_index = 0;
+    let mut end_index;
 
     loop {
         // Get the next packet from the media format.
@@ -86,7 +89,12 @@ fn read_samples(path: &Path) {
             Ok(decoded) => {
                 match decoded {
                     AudioBufferRef::S16(buf) => {
-                        samples_buffer.extend(buf.chan(0));
+                        let samples = buf.chan(0);
+
+                        end_index = start_index + samples.len();
+
+                        samples_buffer[start_index..end_index].copy_from_slice(&samples);
+                        start_index = end_index;
                     },
                     _ => {
                         unimplemented!()
@@ -103,6 +111,7 @@ fn read_samples(path: &Path) {
             Err(_) => break,
         };
     };
+    samples_buffer
 }
 
 
@@ -126,8 +135,8 @@ fn main() {
         let file_path = Path::new(filename);
         let abs_file_path = dir.join(file_path);
 
-        let mut vec: Vec<i16> = Vec::new();
-        read_samples(&abs_file_path, &mut vec);
+        // let mut vec: Vec<i16> = Vec::new();
+        let vec = read_samples(&abs_file_path);
 
         println!("Done Rust. Length {:?}", vec.len());
     }
