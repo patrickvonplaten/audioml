@@ -114,8 +114,8 @@ fn read_samples<T: Clone + std::convert::From<i16>>(path: &Path) -> Vec<T> {
             Err(Error::DecodeError(err)) => panic!("{:?}", err),
             Err(_) => break,
         };
-    }
-    todo!();
+    };
+    samples_buffer
 }
 
 fn main() {
