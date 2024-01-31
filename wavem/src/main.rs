@@ -32,7 +32,57 @@ fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()>
     Ok(())
 }
 
-fn read_samples<T: Clone + std::convert::From<i16>>(path: &Path) -> Vec<T> {
+trait FromSample: Sized {
+    fn from_i16(sample: i16) -> Self;
+    fn from_i32(sample: i32) -> Self;
+    fn from_f32(sample: f32) -> Self;
+}
+
+
+impl FromSample for i16 {
+    fn from_i16(sample: i16) -> Self {
+        sample
+    }
+
+    fn from_i32(sample: i32) -> Self {
+        sample as i16
+    }
+
+    fn from_f32(sample: f32) -> Self {
+        sample as i16
+    }
+}
+
+impl FromSample for i32 {
+    fn from_i16(sample: i16) -> Self {
+        sample as i32
+    }
+
+    fn from_i32(sample: i32) -> Self {
+        sample
+    }
+
+    fn from_f32(sample: f32) -> Self {
+        sample as i32
+    }
+}
+
+impl FromSample for f32 {
+    fn from_i16(sample: i16) -> Self {
+        sample as f32
+    }
+
+    fn from_i32(sample: i32) -> Self {
+        sample as f32
+    }
+
+    fn from_f32(sample: f32) -> Self {
+        sample
+    }
+}
+
+
+fn read_samples<T: Clone + FromSample>(path: &Path) -> Result<Vec<T>, Error> {
     let file = std::fs::File::open(path).expect("failed to open media");
 
     // Create the media source stream.
@@ -44,12 +94,13 @@ fn read_samples<T: Clone + std::convert::From<i16>>(path: &Path) -> Vec<T> {
 
     // Use the default options for metadata and format readers.
     let meta_opts: MetadataOptions = Default::default();
-    let fmt_opts: FormatOptions = Default::default();
+    let fmt_opts: FormatOptions = FormatOptions {
+        enable_gapless: true,
+        ..Default::default()
+    };
 
     // Probe the media source.
-    let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &fmt_opts, &meta_opts)
-        .expect("unsupported format");
+    let mut probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
 
     // Get the instantiated format reader.
     let mut format = probed.format;
@@ -68,11 +119,6 @@ fn read_samples<T: Clone + std::convert::From<i16>>(path: &Path) -> Vec<T> {
     };
 
     let mut samples_buffer: Vec<T> = Vec::with_capacity(sample_len);
-    // let mut samples_buffer: Vec<i16> = vec![0; sample_len];
-    // let mut start_index = 0;
-    // let mut end_index;
-
-    // let mut samples_buffer: Vec<i16> = Vec::with_capacity(sample_len);
 
     // Use the default options for the decoder.
     let dec_opts: DecoderOptions = Default::default();
@@ -93,29 +139,31 @@ fn read_samples<T: Clone + std::convert::From<i16>>(path: &Path) -> Vec<T> {
             Ok(decoded) => {
                 match decoded {
                     AudioBufferRef::S16(buf) => {
+                        // wave
                         let samples = buf.chan(0);
-                        samples_buffer.extend_from_slice(
-                            &samples.iter().map(|&x| x.into()).collect::<Vec<_>>(),
-                        );
+                        samples_buffer.extend(samples.iter().map(|&x| T::from_i16(x)));
 
-                        // start_index = end_index;
+                    }
+                    AudioBufferRef::S32(buf) => {
+                        // flac
+                        let samples = buf.chan(0);
+                        samples_buffer.extend(samples.iter().map(|&x| T::from_i32(x)));
+                    }
+                    AudioBufferRef::F32(buf) => {
+                        // mp3
+                        let samples = buf.chan(0);
+                        samples_buffer.extend(samples.iter().map(|&x| T::from_f32(x)));
                     }
                     _ => {
                         unimplemented!()
                     }
                 }
             }
-            //    let mut audio_buffer: AudioBuffer<i16> = _decoded.make_equivalent();
-            //    _decoded.convert(&mut audio_buffer);
-
-            //    samples_buffer.extend(audio_buffer.chan(0));
-            //    continue
-            //},
             Err(Error::DecodeError(err)) => panic!("{:?}", err),
             Err(_) => break,
         };
     };
-    samples_buffer
+    Ok(samples_buffer)
 }
 
 fn main() {
@@ -138,8 +186,7 @@ fn main() {
         let file_path = Path::new(filename);
         let abs_file_path = dir.join(file_path);
 
-        // let mut vec: Vec<i16> = Vec::new();
-        let vec: Vec<i16> = read_samples(&abs_file_path);
+        let vec: Vec<f32> = read_samples(&abs_file_path).unwrap();
 
         println!("Done Rust. Length {:?}", vec.len());
     }
