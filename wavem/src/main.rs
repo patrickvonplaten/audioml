@@ -1,28 +1,26 @@
+use std::any::type_name;
+use std::env;
+use std::fs;
 use std::i16;
 use std::path::Path;
-use std::env;
 use std::process;
-use std::fs;
-use std::any::type_name;
 
+use std::borrow::Cow;
 use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal};
-use symphonia::core::sample::Sample;
-use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
+use symphonia::core::codecs::{DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::FormatOptions;
-use symphonia::core::meta::MetadataOptions;
 use symphonia::core::io::MediaSourceStream;
+use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
-
+use symphonia::core::sample::Sample;
 
 use std::fs::File;
 use std::io::{self, Write};
 
-
 fn print_type_of<T>(_: &T) {
     println!("{}", type_name::<T>());
 }
-
 
 fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()> {
     let mut file = File::create(file_path)?;
@@ -34,8 +32,7 @@ fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()>
     Ok(())
 }
 
-
-fn read_samples(path: &Path) -> Vec<i16> {
+fn read_samples<T: Clone + std::convert::From<i16>>(path: &Path) -> Vec<T> {
     let file = std::fs::File::open(path).expect("failed to open media");
 
     // Create the media source stream.
@@ -50,16 +47,19 @@ fn read_samples(path: &Path) -> Vec<i16> {
     let fmt_opts: FormatOptions = Default::default();
 
     // Probe the media source.
-    let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts).expect("unsupported format");
+    let probed = symphonia::default::get_probe()
+        .format(&hint, mss, &fmt_opts, &meta_opts)
+        .expect("unsupported format");
 
     // Get the instantiated format reader.
     let mut format = probed.format;
 
     // Find the first audio track with a known (decodeable) codec.
-    let track = format.tracks()
-                    .iter()
-                    .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-                    .expect("no supported audio tracks");
+    let track = format
+        .tracks()
+        .iter()
+        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+        .expect("no supported audio tracks");
 
     let sample_len: usize = if let Some(n_frames) = track.codec_params.n_frames {
         n_frames as usize
@@ -67,7 +67,7 @@ fn read_samples(path: &Path) -> Vec<i16> {
         0
     };
 
-    let mut samples_buffer: Vec<i16> = Vec::with_capacity(sample_len);
+    let mut samples_buffer: Vec<T> = Vec::with_capacity(sample_len);
     // let mut samples_buffer: Vec<i16> = vec![0; sample_len];
     // let mut start_index = 0;
     // let mut end_index;
@@ -78,8 +78,9 @@ fn read_samples(path: &Path) -> Vec<i16> {
     let dec_opts: DecoderOptions = Default::default();
 
     // Create a decoder for the track.
-    let mut decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts).expect("unsupported codec");
-
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &dec_opts)
+        .expect("unsupported codec");
 
     loop {
         // Get the next packet from the media format.
@@ -93,17 +94,17 @@ fn read_samples(path: &Path) -> Vec<i16> {
                 match decoded {
                     AudioBufferRef::S16(buf) => {
                         let samples = buf.chan(0);
-                        samples_buffer.extend_from_slice(&samples);
+                        samples_buffer.extend_from_slice(
+                            &samples.iter().map(|&x| x.into()).collect::<Vec<_>>(),
+                        );
 
-                        // end_index = start_index + samples.len();
-                        // samples_buffer[start_index..end_index].copy_from_slice(&samples);
                         // start_index = end_index;
-                    },
+                    }
                     _ => {
                         unimplemented!()
                     }
                 }
-            },
+            }
             //    let mut audio_buffer: AudioBuffer<i16> = _decoded.make_equivalent();
             //    _decoded.convert(&mut audio_buffer);
 
@@ -113,10 +114,9 @@ fn read_samples(path: &Path) -> Vec<i16> {
             Err(Error::DecodeError(err)) => panic!("{:?}", err),
             Err(_) => break,
         };
-    };
-    samples_buffer
+    }
+    todo!();
 }
-
 
 fn main() {
     // let path: &str = "/Users/patrickvonplaten/audios/sample.wav";
@@ -132,16 +132,15 @@ fn main() {
     let dir = Path::new(&args[1]);
 
     for entry in fs::read_dir(&dir).unwrap() {
-        let filename = entry.unwrap().file_name(); 
+        let filename = entry.unwrap().file_name();
         let filename = filename.to_str().unwrap(); // Get DirEntry from the iterator
 
         let file_path = Path::new(filename);
         let abs_file_path = dir.join(file_path);
 
         // let mut vec: Vec<i16> = Vec::new();
-        let vec = read_samples(&abs_file_path);
+        let vec: Vec<i16> = read_samples(&abs_file_path);
 
         println!("Done Rust. Length {:?}", vec.len());
     }
 }
-
