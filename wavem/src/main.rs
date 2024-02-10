@@ -101,11 +101,16 @@ where
         match decoder.decode(&packet) {
             Ok(decoded) => {
                 match decoded {
-                    AudioBufferRef::F32(buf) => convert(buf, &mut samples_buffer),
-                    AudioBufferRef::S16(buf) => convert(buf, &mut samples_buffer),
-                    AudioBufferRef::S32(buf) => convert(buf, &mut samples_buffer),
-                    AudioBufferRef::U8(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::U8(buf) =>  convert(buf, &mut samples_buffer), 
                     AudioBufferRef::U16(buf) => convert(buf, &mut samples_buffer),
+                    // AudioBufferRef::U24(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::U32(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::S8(buf) =>  convert(buf, &mut samples_buffer),
+                    AudioBufferRef::S16(buf) => convert(buf, &mut samples_buffer),
+                    // AudioBufferRef::S24(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::S32(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::F32(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::F64(buf) => convert(buf, &mut samples_buffer),
                     _ => {
                         unimplemented!()
                     }
