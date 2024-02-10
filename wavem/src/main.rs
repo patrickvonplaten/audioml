@@ -1,88 +1,54 @@
-use std::any::type_name;
 use std::env;
 use std::fs;
-use std::i16;
 use std::path::Path;
 use std::process;
 
-use std::borrow::Cow;
-use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal};
+use num_traits::ToPrimitive;
+use symphonia::core::audio::{AudioBufferRef, Signal};
 use symphonia::core::codecs::{DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error;
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
-use symphonia::core::sample::Sample;
 
-use std::fs::File;
-use std::io::{self, Write};
-
-fn print_type_of<T>(_: &T) {
-    println!("{}", type_name::<T>());
-}
-
-fn write_int16_vector_to_file(vec: &Vec<i16>, file_path: &str) -> io::Result<()> {
-    let mut file = File::create(file_path)?;
-
-    for &value in vec {
-        writeln!(file, "{}", value)?;
-    }
-
-    Ok(())
-}
 
 trait FromSample: Sized {
-    fn from_i16(sample: i16) -> Self;
-    fn from_i32(sample: i32) -> Self;
-    fn from_f32(sample: f32) -> Self;
+    fn from_sample<T: ToPrimitive>(sample: T) -> Self;
 }
 
 
 impl FromSample for i16 {
-    fn from_i16(sample: i16) -> Self {
-        sample
-    }
-
-    fn from_i32(sample: i32) -> Self {
-        sample as i16
-    }
-
-    fn from_f32(sample: f32) -> Self {
-        sample as i16
+    fn from_sample<T: ToPrimitive>(sample: T) -> Self {
+        sample.to_i16().unwrap()
     }
 }
 
 impl FromSample for i32 {
-    fn from_i16(sample: i16) -> Self {
-        sample as i32
-    }
-
-    fn from_i32(sample: i32) -> Self {
-        sample
-    }
-
-    fn from_f32(sample: f32) -> Self {
-        sample as i32
+    fn from_sample<T: ToPrimitive>(sample: T) -> Self {
+        sample.to_i32().unwrap()
     }
 }
 
 impl FromSample for f32 {
-    fn from_i16(sample: i16) -> Self {
-        sample as f32
-    }
-
-    fn from_i32(sample: i32) -> Self {
-        sample as f32
-    }
-
-    fn from_f32(sample: f32) -> Self {
-        sample
+    fn from_sample<T: ToPrimitive>(sample: T) -> Self {
+        sample.to_f32().unwrap()
     }
 }
 
+fn convert<T, S>(buf: std::borrow::Cow<symphonia::core::audio::AudioBuffer<T>>, samples_buffer: &mut Vec<S>)
+where
+    T: symphonia::core::sample::Sample + ToPrimitive,
+    S: Clone + FromSample,
+{
+    samples_buffer.extend(buf.chan(0).iter().map(|&x| S::from_sample(x)));
+}
 
-fn read_samples<T: Clone + FromSample>(path: &Path) -> Result<Vec<T>, Error> {
+
+fn read_samples<T>(path: &Path) -> Result<Vec<T>, Error>
+where
+    T: Clone + FromSample,
+{
     let file = std::fs::File::open(path).expect("failed to open media");
 
     // Create the media source stream.
@@ -94,13 +60,10 @@ fn read_samples<T: Clone + FromSample>(path: &Path) -> Result<Vec<T>, Error> {
 
     // Use the default options for metadata and format readers.
     let meta_opts: MetadataOptions = Default::default();
-    let fmt_opts: FormatOptions = FormatOptions {
-        enable_gapless: true,
-        ..Default::default()
-    };
+    let fmt_opts: FormatOptions = Default::default();
 
     // Probe the media source.
-    let mut probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
+    let probed = symphonia::default::get_probe().format(&hint, mss, &fmt_opts, &meta_opts)?;
 
     // Get the instantiated format reader.
     let mut format = probed.format;
@@ -138,22 +101,11 @@ fn read_samples<T: Clone + FromSample>(path: &Path) -> Result<Vec<T>, Error> {
         match decoder.decode(&packet) {
             Ok(decoded) => {
                 match decoded {
-                    AudioBufferRef::S16(buf) => {
-                        // wave
-                        let samples = buf.chan(0);
-                        samples_buffer.extend(samples.iter().map(|&x| T::from_i16(x)));
-
-                    }
-                    AudioBufferRef::S32(buf) => {
-                        // flac
-                        let samples = buf.chan(0);
-                        samples_buffer.extend(samples.iter().map(|&x| T::from_i32(x)));
-                    }
-                    AudioBufferRef::F32(buf) => {
-                        // mp3
-                        let samples = buf.chan(0);
-                        samples_buffer.extend(samples.iter().map(|&x| T::from_f32(x)));
-                    }
+                    AudioBufferRef::F32(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::S16(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::S32(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::U8(buf) => convert(buf, &mut samples_buffer),
+                    AudioBufferRef::U16(buf) => convert(buf, &mut samples_buffer),
                     _ => {
                         unimplemented!()
                     }
@@ -186,7 +138,7 @@ fn main() {
         let file_path = Path::new(filename);
         let abs_file_path = dir.join(file_path);
 
-        let vec: Vec<f32> = read_samples(&abs_file_path).unwrap();
+        let vec = read_samples::<i32>(&abs_file_path).unwrap();
 
         println!("Done Rust. Length {:?}", vec.len());
     }
